@@ -1,80 +1,90 @@
 import "dotenv/config";
 import { z } from "zod";
 import { tool } from "langchain";
-import { TavilySearch } from "@langchain/tavily";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
+import { HumanMessage } from "@langchain/core/messages";
+import { ProxyAgent, setGlobalDispatcher } from "undici";
 
-import { createDeepAgent, type SubAgent } from "deepagents";
+import { createDeepAgent, type SubAgent, FilesystemBackend } from "deepagents";
 
-type Topic = "general" | "news" | "finance";
+// 如果设置了 PROXY_URL 环境变量，则启用代理
+if (process.env.PROXY_URL) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  setGlobalDispatcher(new ProxyAgent(process.env.PROXY_URL));
+  console.log(`[Proxy] Enabled: ${process.env.PROXY_URL}`);
+}
 
-// Search tool to use to do research
-const internetSearch = tool(
-  async ({
-    query,
-    maxResults = 5,
-    topic = "general" as Topic,
-    includeRawContent = false,
-  }: {
-    query: string;
-    maxResults?: number;
-    topic?: Topic;
-    includeRawContent?: boolean;
-  }) => {
+/**
+ * 本地知识库研究 Agent
+ *
+ * 这个示例展示了如何使用本地知识库（文件系统）来进行研究，
+ * 无需 Tavily API Key 或其他网络搜索工具。
+ *
+ * 知识库位置：./knowledge/
+ */
+
+// 本地知识库搜索工具
+const knowledgeBaseSearch = tool(
+  async ({ query, maxResults = 5 }: { query: string; maxResults?: number }) => {
     /**
-     * Run a web search
+     * 在本地知识库中搜索相关信息
+     *
+     * 注意：这个工具实际上是由 Agent 使用文件系统工具来实现的。
+     * Agent 会使用 grep 搜索关键词，然后 read_file 读取相关文档。
      */
+    return `知识库搜索功能已启用。Agent 将使用以下工具搜索本地知识库：
+- grep: 搜索包含 "${query}" 的文档
+- read_file: 读取相关文档内容
+- glob: 查找所有知识库文件
 
-    // Note: You'll need to install and import tavily-js or similar package
-    // For now, this is a placeholder that shows the structure
-    const tavilySearch = new TavilySearch({
-      maxResults,
-      tavilyApiKey: process.env.TAVILY_API_KEY,
-      includeRawContent,
-      topic,
-    });
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore - Type instantiation is excessively deep and possibly infinite.
-    const tavilyResponse = await tavilySearch._call({ query });
-
-    return tavilyResponse;
+知识库位置: ./knowledge/`;
   },
   {
-    name: "internet_search",
-    description: "Run a web search",
+    name: "knowledge_base_search",
+    description:
+      "Search the local knowledge base for information. Use this tool to find relevant documents in the local knowledge base.",
     schema: z.object({
-      query: z.string().describe("The search query"),
+      query: z
+        .string()
+        .describe("The search query to find in the knowledge base"),
       maxResults: z
         .number()
         .optional()
         .default(5)
-        .describe("Maximum number of results to return"),
-      topic: z
-        .enum(["general", "news", "finance"])
-        .optional()
-        .default("general")
-        .describe("Search topic category"),
-      includeRawContent: z
-        .boolean()
-        .optional()
-        .default(false)
-        .describe("Whether to include raw content"),
+        .describe("Maximum number of documents to return"),
     }),
   },
 );
 
-const subResearchPrompt = `You are a dedicated researcher. Your job is to conduct research based on the users questions.
+const subResearchPrompt = `You are a dedicated researcher. Your job is to conduct research based on the users questions using the local knowledge base.
 
-CConduct thorough research and then reply to the user with a detailed answer to their question
+You have access to a local knowledge base located at ./knowledge/ containing documents about:
+- LangGraph (langgraph-intro.md)
+- Deep Agents (deep-agents-guide.md)
+- AI Agent patterns (ai-agent-patterns.md)
 
-only your FINAL answer will be passed on to the user. They will have NO knowledge of anything except your final message, so your final report should be your final message!`;
+Use the following tools to research:
+1. \`ls\` - List files in the knowledge base
+2. \`glob\` - Find files matching a pattern
+3. \`grep\` - Search for keywords in documents
+4. \`read_file\` - Read the content of relevant documents
+
+Research process:
+1. First, use \`ls\` or \`glob\` to see what documents are available
+2. Use \`grep\` to search for relevant keywords
+3. Use \`read_file\` to read the full content of relevant documents
+4. Synthesize the information and provide a detailed answer
+
+Conduct thorough research and then reply to the user with a detailed answer to their question.
+
+Only your FINAL answer will be passed on to the user. They will have NO knowledge of anything except your final message, so your final report should be your final message!`;
 
 const researchSubAgent: SubAgent = {
   name: "research-agent",
   description:
-    "Used to research more in depth questions. Only give this researcher one topic at a time. Do not pass multiple sub questions to this researcher. Instead, you should break down a large topic into the necessary components, and then call multiple research agents in parallel, one for each sub question.",
+    "Used to research questions using the local knowledge base. Only give this researcher one topic at a time. Do not pass multiple sub questions to this researcher. Instead, you should break down a large topic into the necessary components, and then call multiple research agents in parallel, one for each sub question.",
   systemPrompt: subResearchPrompt,
-  tools: [internetSearch],
+  tools: [knowledgeBaseSearch],
 };
 
 const subCritiquePrompt = `You are a dedicated editor. You are being tasked to critique a report.
@@ -85,7 +95,7 @@ You can find the question/topic for this report at \`question.txt\`.
 
 The user may ask for specific areas to critique the report in. Respond to the user with a detailed critique of the report. Things that could be improved.
 
-You can use the search tool to search for information, if that will help you critique the report
+You can use the knowledge base search tool to look up information if needed to critique the report.
 
 Do not write to the \`final_report.md\` yourself.
 
@@ -102,21 +112,27 @@ Things to check:
 const critiqueSubAgent: SubAgent = {
   name: "critique-agent",
   description:
-    "Used to critique the final report. Give this agent some infomration about how you want it to critique the report.",
+    "Used to critique the final report. Give this agent some information about how you want it to critique the report.",
   systemPrompt: subCritiquePrompt,
+  tools: [knowledgeBaseSearch],
 };
 
 // Prompt prefix to steer the agent to be an expert researcher
-const researchInstructions = `You are an expert researcher. Your job is to conduct thorough research, and then write a polished report.
+const researchInstructions = `You are an expert researcher. Your job is to conduct thorough research using the local knowledge base, and then write a polished report.
+
+The local knowledge base is located at ./knowledge/ and contains the following documents:
+- langgraph-intro.md - Introduction to LangGraph
+- deep-agents-guide.md - Deep Agents usage guide
+- ai-agent-patterns.md - AI Agent design patterns
 
 The first thing you should do is to write the original user question to \`question.txt\` so you have a record of it.
 
 Use the research-agent to conduct deep research. It will respond to your questions/topics with a detailed answer.
 
-When you think you enough information to write a final report, write it to \`final_report.md\`
+When you think you have enough information to write a final report, write it to \`final_report.md\`
 
 You can call the critique-agent to get a critique of the final report. After that (if needed) you can do more research and edit the \`final_report.md\`
-You can do this however many times you want until are you satisfied with the result.
+You can do this however many times you want until you are satisfied with the result.
 
 Only edit the file once at a time (if you call this tool in parallel, there may be conflicts).
 
@@ -130,9 +146,9 @@ Note: the language the report should be in is the language the QUESTION is in, n
 Please create a detailed answer to the overall research brief that:
 1. Is well-organized with proper headings (# for title, ## for sections, ### for subsections)
 2. Includes specific facts and insights from the research
-3. References relevant sources using [Title](URL) format
+3. Cites the source documents (e.g., "According to deep-agents-guide.md...")
 4. Provides a balanced, thorough analysis. Be as comprehensive as possible, and include all information that is relevant to the overall research question. People are using you for deep research and will expect detailed, comprehensive answers.
-5. Includes a "Sources" section at the end with all referenced links
+5. Includes a "Sources" section at the end listing all documents referenced
 
 You can structure your report in a number of different ways. Here are some examples:
 
@@ -178,57 +194,91 @@ Make sure the final answer report is in the SAME language as the human messages 
 Format the report in clear markdown with proper structure and include source references where appropriate.
 
 <Citation Rules>
-- Assign each unique URL a single citation number in your text
-- End with ### Sources that lists each source with corresponding numbers
-- IMPORTANT: Number sources sequentially without gaps (1,2,3,4...) in the final list regardless of which sources you choose
+- Cite documents using their filename (e.g., [deep-agents-guide.md], [langgraph-intro.md])
+- End with ### Sources that lists each source with corresponding citation numbers
+- IMPORTANT: Number sources sequentially without gaps (1,2,3,4...) in the final list
 - Each source should be a separate line item in a list, so that in markdown it is rendered as a list.
 - Example format:
-  [1] Source Title: URL
-  [2] Source Title: URL
-- Citations are extremely important. Make sure to include these, and pay a lot of attention to getting these right. Users will often use these citations to look into more information.
+  [1] deep-agents-guide.md
+  [2] langgraph-intro.md
+- Citations are extremely important. Make sure to include these, and pay a lot of attention to getting these right.
 </Citation Rules>
 </report_instructions>
 
 You have access to a few tools.
 
-## \`internet_search\`
+## \`knowledge_base_search\`
 
-Use this to run an internet search for a given query. You can specify the number of results, the topic, and whether raw content should be included.
+Use this to search the local knowledge base for information. You can specify the search query.
+
+## File System Tools
+
+You also have access to file system tools to interact with the knowledge base:
+- \`ls\` - List files in a directory
+- \`read_file\` - Read file contents
+- \`write_file\` - Write to a file
+- \`edit_file\` - Edit a file
+- \`glob\` - Find files matching a pattern
+- \`grep\` - Search for text in files
 `;
 
 // Create the agent
 export const agent = createDeepAgent({
-  model: new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+  model: new ChatOpenAI({
+    model: "deepseek-chat",
     temperature: 0,
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    configuration: {
+      baseURL: "https://api.deepseek.com/v1",
+    },
   }),
 
-  tools: [internetSearch],
+  tools: [knowledgeBaseSearch],
   systemPrompt: researchInstructions,
   subagents: [critiqueSubAgent, researchSubAgent],
+  // Use FilesystemBackend to access the local knowledge base
+  backend: (config) =>
+    new FilesystemBackend({
+      rootDir: "./knowledge",
+      virtualMode: true,
+    }),
 });
 
-// // Invoke the agent
-// async function main() {
-//   const result = await agent.invoke(
-//     {
-//       messages: [new HumanMessage("what is langgraph?")],
-//     },
-//     { recursionLimit: 1000 }
-//   );
+// Invoke the agent
+async function main() {
+  const question = process.argv[2] || "What is LangGraph?";
 
-//   console.log("🎉 Finished!");
-//   console.log(
-//     `\n\nAgent ToDo List:\n${result.todos.map((todo) => ` - ${todo.content} (${todo.status})`).join("\n")}`
-//   );
-//   console.log(
-//     `\n\nAgent Files:\n${Object.entries(result.files)
-//       .map(([key, value]) => ` - ${key}: ${value}`)
-//       .join("\n")}`
-//   );
-// }
+  console.log(`🔍 Research question: ${question}\n`);
+  console.log("📚 Using local knowledge base at: ./knowledge/\n");
 
-// // Run if this file is executed directly
-// if (import.meta.url === `file://${process.argv[1]}`) {
-//   main();
-// }
+  const result = await agent.invoke(
+    {
+      messages: [new HumanMessage(question)],
+    },
+    { recursionLimit: 100 },
+  );
+
+  console.log("\n🎉 Finished!\n");
+  console.log(
+    `\n\nAgent ToDo List:\n${result.todos.map((todo: { content: string; status: string }) => ` - ${todo.content} (${todo.status})`).join("\n")}`,
+  );
+  if (result.files) {
+    console.log(
+      `\n\nAgent Files:\n${Object.entries(result.files)
+        .map(
+          ([key, value]) => ` - ${key}: ${String(value).substring(0, 100)}...`,
+        )
+        .join("\n")}`,
+    );
+  }
+
+  // Print final answer
+  const lastMessage = result.messages[result.messages.length - 1];
+  console.log("\n\n📄 Final Report:\n");
+  console.log(lastMessage.content);
+}
+
+// Run if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

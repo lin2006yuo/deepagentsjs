@@ -3,7 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "research": "PROXY_URL=http://127.0.0.1:8899 DEEPSEEK_API_KEY=sk-4773319adf37447793e7286857ddec88 npx tsx research/research-agent.ts",
+    "research:default": "PROXY_URL=http://127.0.0.1:8899 DEEPSEEK_API_KEY=sk-4773319adf37447793e7286857ddec88 npx tsx research/research-agent.ts 'What is LangGraph?'",
+    "research:proxy": "PROXY_URL=http://127.0.0.1:8899 DEEPSEEK_API_KEY=sk-4773319adf37447793e7286857ddec88 npx tsx"
   },
   "dependencies": {
     "deepagents": "workspace:*",

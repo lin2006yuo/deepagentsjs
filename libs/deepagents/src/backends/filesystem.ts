@@ -557,6 +557,7 @@ export class FilesystemBackend implements BackendProtocol {
       absolute: true,
       onlyFiles: true,
       dot: true,
+      suppressErrors: true,
     });
 
     for (const fp of files) {
@@ -643,6 +644,7 @@ export class FilesystemBackend implements BackendProtocol {
         absolute: true,
         onlyFiles: true,
         dot: true,
+        suppressErrors: true,
       });
 
       for (const matchedPath of matches) {
