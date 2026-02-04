@@ -1,0 +1,21 @@
+{
+  "name": "deepagents-web-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DeepAgents Web UI - Interactive interface for research, filesystem, memory and skills",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter './**' build",
+    "dev": "pnpm --parallel --filter './**' dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev:server": "pnpm --filter server dev",
+    "lint": "eslint .",
+    "typecheck": "pnpm --filter './**' typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.27.0"
+}
