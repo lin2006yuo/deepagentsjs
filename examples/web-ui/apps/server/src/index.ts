@@ -3,6 +3,8 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 // 设置全局代理，影响所有 fetch
 setGlobalDispatcher(new ProxyAgent("http://127.0.0.1:8899"));
 
+import "dotenv/config";
+
 import express from "express";
 import cors from "cors";
 import * as path from "path";

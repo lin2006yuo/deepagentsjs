@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { toast } from 'sonner'
+import { useEffect, useState, useCallback } from "react";
+import { toast } from "sonner";
 import {
   Folder,
   File,
@@ -11,17 +11,18 @@ import {
   Save,
   X,
   RefreshCw,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+  Search,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -30,24 +31,33 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { useFilesystemStore } from '@/stores'
+} from "@/components/ui/dialog";
+import { useFilesystemStore } from "@/stores";
 import {
   fetchFileList,
   fetchFileContent,
   writeFile,
   deleteFile,
   createDirectory,
-} from '@/services/api'
-import type { FileInfo } from '@deepagents/shared'
-import { formatFileSize, formatTimestamp } from '@deepagents/shared'
+  searchFiles,
+  globFiles,
+} from "@/services/api";
+import type { GrepMatch } from "@/services/api";
+import type { FileInfo as SharedFileInfo } from "@deepagents/shared";
+import { formatFileSize, formatTimestamp } from "@deepagents/shared";
 
 export function FilesystemPage() {
-  const [newFileName, setNewFileName] = useState('')
-  const [newDirName, setNewDirName] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
-  const [showNewFileDialog, setShowNewFileDialog] = useState(false)
-  const [showNewDirDialog, setShowNewDirDialog] = useState(false)
+  const [newFileName, setNewFileName] = useState("");
+  const [newDirName, setNewDirName] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [showNewFileDialog, setShowNewFileDialog] = useState(false);
+  const [showNewDirDialog, setShowNewDirDialog] = useState(false);
+
+  // Search state
+  const [searchPattern, setSearchPattern] = useState("");
+  const [searchResults, setSearchResults] = useState<GrepMatch[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   const {
     currentPath,
@@ -61,109 +71,131 @@ export function FilesystemPage() {
     setFileContent,
     setIsLoading,
     navigateToParent,
-  } = useFilesystemStore()
+  } = useFilesystemStore();
 
   const loadFiles = useCallback(async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const data = await fetchFileList(currentPath)
-      setFiles(data.files)
+      const data = await fetchFileList(currentPath);
+      setFiles(data.files);
     } catch (error) {
-      toast.error('加载文件列表失败')
+      toast.error("加载文件列表失败");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [currentPath, setFiles, setIsLoading])
+  }, [currentPath, setFiles, setIsLoading]);
 
   useEffect(() => {
-    loadFiles()
-  }, [loadFiles])
+    loadFiles();
+  }, [loadFiles]);
 
-  const handleFileClick = async (file: FileInfo) => {
+  const handleFileClick = async (file: SharedFileInfo) => {
     if (file.isDirectory) {
-      setCurrentPath(file.path)
-      setSelectedFile(null)
-      setFileContent('')
+      setCurrentPath(file.path);
+      setSelectedFile(null);
+      setFileContent("");
     } else {
-      setSelectedFile(file)
-      setIsLoading(true)
+      setSelectedFile(file);
+      setIsLoading(true);
       try {
-        const content = await fetchFileContent(file.path)
-        setFileContent(content.content)
-        setIsEditing(false)
+        const content = await fetchFileContent(file.path);
+        setFileContent(content.content);
+        setIsEditing(false);
       } catch (error) {
-        toast.error('加载文件内容失败')
+        toast.error("加载文件内容失败");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
-  }
+  };
 
   const handleSaveFile = async () => {
-    if (!selectedFile) return
+    if (!selectedFile) return;
 
     try {
-      await writeFile(selectedFile.path, fileContent)
-      toast.success('文件保存成功')
-      setIsEditing(false)
-      loadFiles()
+      await writeFile(selectedFile.path, fileContent);
+      toast.success("文件保存成功");
+      setIsEditing(false);
+      loadFiles();
     } catch (error) {
-      toast.error('保存文件失败')
+      toast.error("保存文件失败");
     }
-  }
+  };
 
-  const handleDeleteFile = async (file: FileInfo) => {
-    if (!confirm(`确定要删除 ${file.name} 吗？`)) return
+  const handleDeleteFile = async (file: SharedFileInfo) => {
+    if (!confirm(`确定要删除 ${file.name} 吗？`)) return;
 
     try {
-      await deleteFile(file.path)
-      toast.success('删除成功')
+      await deleteFile(file.path);
+      toast.success("删除成功");
       if (selectedFile?.path === file.path) {
-        setSelectedFile(null)
-        setFileContent('')
+        setSelectedFile(null);
+        setFileContent("");
       }
-      loadFiles()
+      loadFiles();
     } catch (error) {
-      toast.error('删除失败')
+      toast.error("删除失败");
     }
-  }
+  };
 
   const handleCreateFile = async () => {
-    if (!newFileName.trim()) return
+    if (!newFileName.trim()) return;
 
-    const filePath = currentPath === '.' ? newFileName : `${currentPath}/${newFileName}`
+    const filePath =
+      currentPath === "." ? newFileName : `${currentPath}/${newFileName}`;
     try {
-      await writeFile(filePath, '')
-      toast.success('文件创建成功')
-      setNewFileName('')
-      setShowNewFileDialog(false)
-      loadFiles()
+      await writeFile(filePath, "");
+      toast.success("文件创建成功");
+      setNewFileName("");
+      setShowNewFileDialog(false);
+      loadFiles();
     } catch (error) {
-      toast.error('创建文件失败')
+      toast.error("创建文件失败");
     }
-  }
+  };
 
   const handleCreateDirectory = async () => {
-    if (!newDirName.trim()) return
+    if (!newDirName.trim()) return;
 
-    const dirPath = currentPath === '.' ? newDirName : `${currentPath}/${newDirName}`
+    const dirPath =
+      currentPath === "." ? newDirName : `${currentPath}/${newDirName}`;
     try {
-      await createDirectory(dirPath)
-      toast.success('目录创建成功')
-      setNewDirName('')
-      setShowNewDirDialog(false)
-      loadFiles()
+      await createDirectory(dirPath);
+      toast.success("目录创建成功");
+      setNewDirName("");
+      setShowNewDirDialog(false);
+      loadFiles();
     } catch (error) {
-      toast.error('创建目录失败')
+      toast.error("创建目录失败");
     }
-  }
+  };
 
-  const getFileIcon = (file: FileInfo) => {
+  const getFileIcon = (file: SharedFileInfo) => {
     if (file.isDirectory) {
-      return <Folder className="w-5 h-5 text-blue-500" />
+      return <Folder className="w-5 h-5 text-blue-500" />;
     }
-    return <File className="w-5 h-5 text-gray-500" />
-  }
+    return <File className="w-5 h-5 text-gray-500" />;
+  };
+
+  const handleSearch = async () => {
+    if (!searchPattern.trim()) return;
+
+    setIsSearching(true);
+    try {
+      const results = await searchFiles(searchPattern, {
+        path: "/",
+        target: "workspace",
+      });
+      setSearchResults(results.matches);
+      if (results.matches.length === 0) {
+        toast.info("未找到匹配内容");
+      }
+    } catch (error) {
+      toast.error("搜索失败");
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -173,6 +205,10 @@ export function FilesystemPage() {
           <p className="text-muted-foreground">管理工作区文件</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowSearch(!showSearch)}>
+            <Search className="w-4 h-4 mr-2" />
+            搜索
+          </Button>
           <Button variant="outline" onClick={loadFiles}>
             <RefreshCw className="w-4 h-4 mr-2" />
             刷新
@@ -195,7 +231,10 @@ export function FilesystemPage() {
                 placeholder="目录名称"
               />
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowNewDirDialog(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowNewDirDialog(false)}
+                >
                   取消
                 </Button>
                 <Button onClick={handleCreateDirectory}>创建</Button>
@@ -220,7 +259,10 @@ export function FilesystemPage() {
                 placeholder="文件名"
               />
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowNewFileDialog(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowNewFileDialog(false)}
+                >
                   取消
                 </Button>
                 <Button onClick={handleCreateFile}>创建</Button>
@@ -230,12 +272,83 @@ export function FilesystemPage() {
         </div>
       </div>
 
+      {/* Search Panel */}
+      {showSearch && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Search className="w-5 h-5" />
+              搜索文件内容
+            </CardTitle>
+            <CardDescription>使用正则表达式搜索工作区文件</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="输入搜索关键词或正则表达式..."
+                value={searchPattern}
+                onChange={(e) => setSearchPattern(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+              <Button
+                onClick={handleSearch}
+                disabled={isSearching || !searchPattern.trim()}
+              >
+                {isSearching ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+
+            {searchResults.length > 0 && (
+              <div className="border rounded-md overflow-hidden">
+                <div className="bg-muted px-4 py-2 text-sm font-medium">
+                  搜索结果 ({searchResults.length} 条匹配)
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {searchResults.map((match, index) => (
+                    <div
+                      key={index}
+                      className="px-4 py-2 border-b last:border-b-0 hover:bg-muted cursor-pointer"
+                      onClick={() => {
+                        // Navigate to file
+                        const dirPath = match.path.substring(
+                          0,
+                          match.path.lastIndexOf("/"),
+                        );
+                        setCurrentPath(dirPath || ".");
+                        setShowSearch(false);
+                        loadFiles();
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-blue-600">
+                          {match.path}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          第 {match.line} 行
+                        </span>
+                      </div>
+                      <div className="text-sm text-muted-foreground truncate">
+                        {match.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* File List */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              {currentPath !== '.' && (
+              {currentPath !== "." && (
                 <Button variant="ghost" size="sm" onClick={navigateToParent}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
@@ -247,7 +360,9 @@ export function FilesystemPage() {
           <CardContent>
             <div className="space-y-1">
               {isLoading && files.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">加载中...</p>
+                <p className="text-center text-muted-foreground py-8">
+                  加载中...
+                </p>
               ) : files.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">空目录</p>
               ) : (
@@ -256,8 +371,8 @@ export function FilesystemPage() {
                     key={file.path}
                     className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors ${
                       selectedFile?.path === file.path
-                        ? 'bg-primary/10'
-                        : 'hover:bg-muted'
+                        ? "bg-primary/10"
+                        : "hover:bg-muted"
                     }`}
                     onClick={() => handleFileClick(file)}
                   >
@@ -267,7 +382,7 @@ export function FilesystemPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-xs text-muted-foreground">
-                        {file.isDirectory ? '--' : formatFileSize(file.size)}
+                        {file.isDirectory ? "--" : formatFileSize(file.size)}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {formatTimestamp(file.modifiedAt)}
@@ -276,8 +391,8 @@ export function FilesystemPage() {
                         variant="ghost"
                         size="sm"
                         onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteFile(file)
+                          e.stopPropagation();
+                          handleDeleteFile(file);
                         }}
                       >
                         <Trash2 className="w-4 h-4 text-red-500" />
@@ -296,21 +411,25 @@ export function FilesystemPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg">
-                  {selectedFile ? selectedFile.name : '文件编辑器'}
+                  {selectedFile ? selectedFile.name : "文件编辑器"}
                 </CardTitle>
                 <CardDescription>
                   {selectedFile
                     ? selectedFile.isDirectory
-                      ? '目录'
+                      ? "目录"
                       : `${formatFileSize(selectedFile.size)}`
-                    : '选择文件进行编辑'}
+                    : "选择文件进行编辑"}
                 </CardDescription>
               </div>
               {selectedFile && !selectedFile.isDirectory && (
                 <div className="flex gap-2">
                   {isEditing ? (
                     <>
-                      <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditing(false)}
+                      >
                         <X className="w-4 h-4 mr-2" />
                         取消
                       </Button>
@@ -355,5 +474,5 @@ export function FilesystemPage() {
         </Card>
       </div>
     </div>
-  )
+  );
 }

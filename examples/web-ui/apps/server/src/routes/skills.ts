@@ -1,9 +1,9 @@
-import { Router } from 'express';
-import * as path from 'path';
-import * as fs from 'fs';
-import { fileURLToPath } from 'url';
-import { z } from 'zod';
-import type { SkillInfo } from '@deepagents/shared';
+import { Router } from "express";
+import * as path from "path";
+import * as fs from "fs";
+import { fileURLToPath } from "url";
+import { z } from "zod/v4";
+import type { SkillInfo } from "@deepagents/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 const router = Router();
 
 // Skills storage path
-const SKILLS_PATH = path.join(__dirname, '../../data/skills');
+const SKILLS_PATH = path.join(__dirname, "../../data/skills");
 
 // Ensure skills directory exists
 if (!fs.existsSync(SKILLS_PATH)) {
@@ -20,14 +20,14 @@ if (!fs.existsSync(SKILLS_PATH)) {
 
 // Parse SKILL.md frontmatter
 function parseSkillMd(content: string): { name: string; description: string } {
-  const lines = content.split('\n');
-  let name = 'Unknown';
-  let description = '';
+  const lines = content.split("\n");
+  let name = "Unknown";
+  let description = "";
 
-  if (lines[0] === '---') {
-    const endIndex = lines.slice(1).findIndex(line => line === '---');
+  if (lines[0] === "---") {
+    const endIndex = lines.slice(1).findIndex((line) => line === "---");
     if (endIndex !== -1) {
-      const frontmatter = lines.slice(1, endIndex + 1).join('\n');
+      const frontmatter = lines.slice(1, endIndex + 1).join("\n");
       const nameMatch = frontmatter.match(/name:\s*(.+)/);
       const descMatch = frontmatter.match(/description:\s*(.+)/);
       if (nameMatch) name = nameMatch[1].trim();
@@ -39,7 +39,7 @@ function parseSkillMd(content: string): { name: string; description: string } {
 }
 
 // GET /api/skills - List all skills
-router.get('/', (req, res) => {
+router.get("/", (req, res) => {
   try {
     const skills: SkillInfo[] = [];
 
@@ -47,14 +47,14 @@ router.get('/', (req, res) => {
       const entries = fs.readdirSync(SKILLS_PATH, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory()) {
-          const skillMdPath = path.join(SKILLS_PATH, entry.name, 'SKILL.md');
+          const skillMdPath = path.join(SKILLS_PATH, entry.name, "SKILL.md");
           if (fs.existsSync(skillMdPath)) {
-            const content = fs.readFileSync(skillMdPath, 'utf-8');
+            const content = fs.readFileSync(skillMdPath, "utf-8");
             const { name, description } = parseSkillMd(content);
             skills.push({
               name: name || entry.name,
               description,
-              path: entry.name
+              path: entry.name,
             });
           }
         }
@@ -63,33 +63,33 @@ router.get('/', (req, res) => {
 
     res.json({ skills });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to list skills' });
+    res.status(500).json({ error: "Failed to list skills" });
   }
 });
 
 // GET /api/skills/:name - Get skill details
-router.get('/:name', (req, res) => {
+router.get("/:name", (req, res) => {
   try {
     const skillName = req.params.name;
     const skillDir = path.join(SKILLS_PATH, skillName);
-    const skillMdPath = path.join(skillDir, 'SKILL.md');
+    const skillMdPath = path.join(skillDir, "SKILL.md");
 
     if (!fs.existsSync(skillMdPath)) {
-      res.status(404).json({ error: 'Skill not found' });
+      res.status(404).json({ error: "Skill not found" });
       return;
     }
 
-    const content = fs.readFileSync(skillMdPath, 'utf-8');
+    const content = fs.readFileSync(skillMdPath, "utf-8");
     const { name, description } = parseSkillMd(content);
 
     res.json({
       name: name || skillName,
       description,
       path: skillName,
-      content
+      content,
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get skill' });
+    res.status(500).json({ error: "Failed to get skill" });
   }
 });
 
@@ -97,14 +97,16 @@ router.get('/:name', (req, res) => {
 const createSchema = z.object({
   name: z.string().min(1),
   description: z.string(),
-  content: z.string()
+  content: z.string(),
 });
 
-router.post('/', (req, res) => {
+router.post("/", (req, res) => {
   try {
     const result = createSchema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ error: 'Invalid request', details: result.error.errors });
+      res
+        .status(400)
+        .json({ error: "Invalid request", details: result.error.issues });
       return;
     }
 
@@ -112,7 +114,7 @@ router.post('/', (req, res) => {
     const skillDir = path.join(SKILLS_PATH, name);
 
     if (fs.existsSync(skillDir)) {
-      res.status(409).json({ error: 'Skill already exists' });
+      res.status(409).json({ error: "Skill already exists" });
       return;
     }
 
@@ -125,72 +127,74 @@ description: ${description}
 
 ${content}`;
 
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), skillMdContent, 'utf-8');
+    fs.writeFileSync(path.join(skillDir, "SKILL.md"), skillMdContent, "utf-8");
 
     res.json({ success: true, name });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create skill' });
+    res.status(500).json({ error: "Failed to create skill" });
   }
 });
 
 // PUT /api/skills/:name - Update skill
 const updateSchema = z.object({
   description: z.string().optional(),
-  content: z.string()
+  content: z.string(),
 });
 
-router.put('/:name', (req, res) => {
+router.put("/:name", (req, res) => {
   try {
     const skillName = req.params.name;
     const result = updateSchema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ error: 'Invalid request', details: result.error.errors });
+      res
+        .status(400)
+        .json({ error: "Invalid request", details: result.error.issues });
       return;
     }
 
     const { description, content } = result.data;
     const skillDir = path.join(SKILLS_PATH, skillName);
-    const skillMdPath = path.join(skillDir, 'SKILL.md');
+    const skillMdPath = path.join(skillDir, "SKILL.md");
 
     if (!fs.existsSync(skillMdPath)) {
-      res.status(404).json({ error: 'Skill not found' });
+      res.status(404).json({ error: "Skill not found" });
       return;
     }
 
     // Parse existing to keep name
-    const existing = fs.readFileSync(skillMdPath, 'utf-8');
+    const existing = fs.readFileSync(skillMdPath, "utf-8");
     const { name: existingName } = parseSkillMd(existing);
 
     const skillMdContent = `---
 name: ${existingName || skillName}
-description: ${description || ''}
+description: ${description || ""}
 ---
 
 ${content}`;
 
-    fs.writeFileSync(skillMdPath, skillMdContent, 'utf-8');
+    fs.writeFileSync(skillMdPath, skillMdContent, "utf-8");
 
     res.json({ success: true, name: skillName });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update skill' });
+    res.status(500).json({ error: "Failed to update skill" });
   }
 });
 
 // DELETE /api/skills/:name - Delete skill
-router.delete('/:name', (req, res) => {
+router.delete("/:name", (req, res) => {
   try {
     const skillName = req.params.name;
     const skillDir = path.join(SKILLS_PATH, skillName);
 
     if (!fs.existsSync(skillDir)) {
-      res.status(404).json({ error: 'Skill not found' });
+      res.status(404).json({ error: "Skill not found" });
       return;
     }
 
     fs.rmdirSync(skillDir, { recursive: true });
     res.json({ success: true, name: skillName });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete skill' });
+    res.status(500).json({ error: "Failed to delete skill" });
   }
 });
 

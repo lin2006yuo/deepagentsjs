@@ -1,0 +1,22 @@
+{
+  "id": "1770311810118-ooc3tzlb2",
+  "question": "langgraph 是什么",
+  "status": "completed",
+  "createdAt": 1770311810119,
+  "updatedAt": 1770311913820,
+  "todos": [
+    {
+      "content": "搜索知识库文档",
+      "status": "completed"
+    },
+    {
+      "content": "分析研究主题",
+      "status": "in_progress"
+    },
+    {
+      "content": "生成研究报告",
+      "status": "pending"
+    }
+  ],
+  "report": "# 研究报告: langgraph 是什么\n\n## 概述\n\n本报告基于本地知识库对 \"langgraph 是什么\" 进行了深入研究。\n\n## 知识库文档\n\n研究过程中读取了以下文档：\n- ai-agent-patterns.md\n- deep-agents-guide.md\n- langgraph-intro.md\n\n## 文档内容摘要\n\n### ai-agent-patterns.md\n\n     1\t# AI Agent 设计模式\n     2\t\n     3\t## ReAct 模式\n     4\t\n     5\tReAct (Reasoning + Acting) 是一种将推理和行动结合的模式：\n     6\t\n     7\t1. **思考 (Thought)**：分析当前情况\n     8\t2. **行动 (Action)**：执行工具调用\n     9\t3. **观察 (Observation)**：获取执行结果\n    10\t4. **循环**：重复直到完成任务\n    11\t\n    12\t## Plan-and-Execute 模式\n    13\t\n    14\t先规划，后执行：\n    15\t\n    16\t1. **规划阶段**：将任务分解为子任务\n    17\t2. **执行阶段**：按顺序完成子任务\n    18\t3. **验证阶段**：检查结果是否符合预期\n    19\t\n    20\t## Multi-Agent 协作\n    21\t\n    22\t多个代理协同工作：\n    23\t\n    24\t- **主管代理**：分配任务\n    25\t- **专业代理**：执行特定任务\n    26\t- **审查代理**：检查结果\n    27\t\n    28\t## 工具使用模式\n    29\t\n    30\t### 工具选择策略\n    31\t- 基于描述匹配\n    32\t- 基于历史成功率\n    33\t- 基于任务类型\n    34\t\n    35\t### 错误处理\n    36\t- 工具调用失败重试\n    37\t- 备选工具切换\n    38\t- 人工介入请求\n    39\t\n\n### deep-agents-guide.md\n\n     1\t# Deep Agents 使用指南\n     2\t\n     3\tDeep Agents 是基于 LangGraph 的高级 AI 代理框架。\n     4\t\n     5\t## 核心组件\n     6\t\n     7\t### 1. 代理 (Agent)\n     8\t代理是执行任务的实体，可以：\n     9\t- 调用工具\n    10\t- 与其他代理协作\n    11\t- 管理记忆\n    12\t\n    13\t### 2. 技能 (Skills)\n    14\t技能是可复用的功能模块：\n    15\t- 文件操作\n    16\t- 网络搜索\n    17\t- 代码执行\n    18\t- 数据分析\n    19\t\n    20\t### 3. 记忆 (Memory)\n    21\t支持多种记忆类型：\n    22\t- **短期记忆**：当前会话上下文\n    23\t- **长期记忆**：跨会话持久化\n    24\t- **知识库**：结构化文档存储\n    25\t\n    26\t## 快速开始\n    27\t\n    28\t```python\n    29\tfrom deep_agents import Agent, Skill\n    30\t\n    31\t# 创建代理\n    32\tagent = Agent(\n    33\t    name=\"researcher\",\n    34\t    skills=[\"search\", \"read_file\"]\n    35\t)\n    36\t\n    37\t# 执行任务\n    38\tresult = agent.run(\"研究 LangGraph 的最新特性\")\n    39\t```\n    40\t\n    41\t## 最佳实践\n    42\t\n    43\t1. 为代理定义清晰的角色和职责\n    44\t2. 使用技能组合完成复杂任务\n    45\t3. 合理设计记忆策略\n    46\t4. 添加错误处理和重试机制\n    47\t\n\n### langgraph-intro.md\n\n     1\t# LangGraph 简介\n     2\t\n     3\tLangGraph 是一个用于构建复杂 AI 代理工作流的 Python 库。\n     4\t\n     5\t## 核心概念\n     6\t\n     7\t### 状态管理\n     8\tLangGraph 使用状态机模式管理代理状态，每个节点可以读取和修改共享状态。\n     9\t\n    10\t### 图结构\n    11\t工作流被建模为有向图，其中：\n    12\t- **节点 (Nodes)**：代表代理、工具或函数\n    13\t- **边 (Edges)**：代表状态转换\n    14\t\n    15\t### 循环支持\n    16\t与其他框架不同，LangGraph 原生支持循环，适合构建多步骤推理流程。\n    17\t\n    18\t## 主要特性\n    19\t\n    20\t1. **持久化**：内置状态持久化，支持断点续传\n    21\t2. **人机协同**：支持 Human-in-the-loop 模式\n    22\t3. **流式输出**：实时流式返回中间结果\n    23\t4. **可视化**：内置图结构可视化工具\n    24\t\n    25\t## 使用场景\n    26\t\n    27\t- 多步骤研究代理\n    28\t- 代码生成与审查\n    29\t- 对话系统\n    30\t- 自动化工作流\n    31\t\n\n## 结论\n\n基于知识库文档的分析，研究已完成。具体内容请参考上述文档。\n\n## 来源\n\nai-agent-patterns.md\n- deep-agents-guide.md\n- langgraph-intro.md\n"
+}

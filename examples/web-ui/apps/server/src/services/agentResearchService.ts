@@ -1,52 +1,27 @@
-import { config } from "dotenv";
-import { z } from "zod";
-
-// 从当前文件所在目录加载 .env 文件
+import { z } from "zod/v4";
+import { tool } from "@langchain/core/tools";
+import { ChatOpenAI } from "@langchain/openai";
+import { HumanMessage, AIMessage } from "@langchain/core/messages";
+import { createDeepAgent, type SubAgent, FilesystemBackend } from "deepagents";
+import * as path from "path";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import type { ResearchStreamChunk } from "@deepagents/shared";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
-config({ path: join(__dirname, ".env") });
-import { tool } from "langchain";
-import { ChatOpenAI } from "@langchain/openai";
-import { HumanMessage } from "@langchain/core/messages";
-import { ProxyAgent, setGlobalDispatcher } from "undici";
+// Knowledge base path
+const KNOWLEDGE_PATH = path.join(__dirname, "../../data/knowledge");
 
-import { createDeepAgent, type SubAgent, FilesystemBackend } from "deepagents";
-
-// 如果设置了 PROXY_URL 环境变量，则启用代理
-if (process.env.PROXY_URL) {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-  setGlobalDispatcher(new ProxyAgent(process.env.PROXY_URL));
-  console.log(`[Proxy] Enabled: ${process.env.PROXY_URL}`);
-}
-
-/**
- * 本地知识库研究 Agent
- *
- * 这个示例展示了如何使用本地知识库（文件系统）来进行研究，
- * 无需 Tavily API Key 或其他网络搜索工具。
- *
- * 知识库位置：./knowledge/
- */
-
-// 本地知识库搜索工具
+// Local knowledge base search tool
 const knowledgeBaseSearch = tool(
   async ({ query, maxResults = 5 }: { query: string; maxResults?: number }) => {
-    /**
-     * 在本地知识库中搜索相关信息
-     *
-     * 注意：这个工具实际上是由 Agent 使用文件系统工具来实现的。
-     * Agent 会使用 grep 搜索关键词，然后 read_file 读取相关文档。
-     */
-    return `知识库搜索功能已启用。Agent 将使用以下工具搜索本地知识库：
-- grep: 搜索包含 "${query}" 的文档
-- read_file: 读取相关文档内容
-- glob: 查找所有知识库文件
+    return `Knowledge base search enabled. Agent will use these tools to search:
+- grep: Search for "${query}" in documents
+- read_file: Read relevant document content
+- glob: Find all knowledge base files
 
-知识库位置: ./knowledge/`;
+Knowledge base location: ${KNOWLEDGE_PATH}`;
   },
   {
     name: "knowledge_base_search",
@@ -65,9 +40,10 @@ const knowledgeBaseSearch = tool(
   },
 );
 
-const subResearchPrompt = `You are a dedicated researcher. Your job is to conduct research based on the users questions using the local knowledge base.
+// Research sub-agent prompt
+const subResearchPrompt = `You are a dedicated researcher. Your job is to conduct research based on the user's questions using the local knowledge base.
 
-You have access to a local knowledge base located at ./knowledge/ containing documents about:
+You have access to a local knowledge base containing documents about:
 - LangGraph (langgraph-intro.md)
 - Deep Agents (deep-agents-guide.md)
 - AI Agent patterns (ai-agent-patterns.md)
@@ -84,9 +60,9 @@ Research process:
 3. Use \`read_file\` to read the full content of relevant documents
 4. Synthesize the information and provide a detailed answer
 
-Conduct thorough research and then reply to the user with a detailed answer to their question.
+Conduct thorough research and then reply with a detailed answer to the question.
 
-Only your FINAL answer will be passed on to the user. They will have NO knowledge of anything except your final message, so your final report should be your final message!`;
+Only your FINAL answer will be passed on. The user will have NO knowledge of anything except your final message, so your final report should be your final message!`;
 
 const researchSubAgent: SubAgent = {
   name: "research-agent",
@@ -96,13 +72,14 @@ const researchSubAgent: SubAgent = {
   tools: [knowledgeBaseSearch],
 };
 
+// Critique sub-agent prompt
 const subCritiquePrompt = `You are a dedicated editor. You are being tasked to critique a report.
 
 You can find the report at \`final_report.md\`.
 
 You can find the question/topic for this report at \`question.txt\`.
 
-The user may ask for specific areas to critique the report in. Respond to the user with a detailed critique of the report. Things that could be improved.
+Respond with a detailed critique of the report. Things that could be improved.
 
 You can use the knowledge base search tool to look up information if needed to critique the report.
 
@@ -115,8 +92,7 @@ Things to check:
 - Check that the article covers key areas of the industry, ensures overall understanding, and does not omit important parts.
 - Check that the article deeply analyzes causes, impacts, and trends, providing valuable insights
 - Check that the article closely follows the research topic and directly answers questions
-- Check that the article has a clear structure, fluent language, and is easy to understand.
-`;
+- Check that the article has a clear structure, fluent language, and is easy to understand.`;
 
 const critiqueSubAgent: SubAgent = {
   name: "critique-agent",
@@ -126,7 +102,7 @@ const critiqueSubAgent: SubAgent = {
   tools: [knowledgeBaseSearch],
 };
 
-// Prompt prefix to steer the agent to be an expert researcher
+// Main research instructions
 const researchInstructions = `You are an expert researcher. Your job is to conduct thorough research using the local knowledge base, and then write a polished report.
 
 The local knowledge base is located at ./knowledge/ and contains the following documents:
@@ -144,8 +120,6 @@ You can call the critique-agent to get a critique of the final report. After tha
 You can do this however many times you want until you are satisfied with the result.
 
 Only edit the file once at a time (if you call this tool in parallel, there may be conflicts).
-
-Here are instructions for writing the final report:
 
 <report_instructions>
 
@@ -231,63 +205,98 @@ You also have access to file system tools to interact with the knowledge base:
 - \`grep\` - Search for text in files
 `;
 
-// Create the agent
-export const agent = createDeepAgent({
-  model: new ChatOpenAI({
-    model: "deepseek-chat",
-    temperature: 0,
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    configuration: {
-      baseURL: "https://api.deepseek.com/v1",
-    },
-  }),
+// Create the research agent
+export function createResearchAgent() {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
 
-  tools: [knowledgeBaseSearch],
-  systemPrompt: researchInstructions,
-  subagents: [critiqueSubAgent, researchSubAgent],
-  // Use FilesystemBackend to access the local knowledge base
-  backend: (config) =>
-    new FilesystemBackend({
-      rootDir: "./knowledge",
-      virtualMode: true,
-    }),
-});
-
-// Invoke the agent
-async function main() {
-  const question = process.argv[2] || "What is LangGraph?";
-
-  console.log(`🔍 Research question: ${question}\n`);
-  console.log("📚 Using local knowledge base at: ./knowledge/\n");
-
-  const result = await agent.invoke(
-    {
-      messages: [new HumanMessage(question)],
-    },
-    { recursionLimit: 100 },
-  );
-
-  console.log("\n🎉 Finished!\n");
-  console.log(
-    `\n\nAgent ToDo List:\n${result.todos.map((todo: { content: string; status: string }) => ` - ${todo.content} (${todo.status})`).join("\n")}`,
-  );
-  if (result.files) {
-    console.log(
-      `\n\nAgent Files:\n${Object.entries(result.files)
-        .map(
-          ([key, value]) => ` - ${key}: ${String(value).substring(0, 100)}...`,
-        )
-        .join("\n")}`,
-    );
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY environment variable is required");
   }
 
-  // Print final answer
-  const lastMessage = result.messages[result.messages.length - 1];
-  console.log("\n\n📄 Final Report:\n");
-  console.log(lastMessage.content);
+  return createDeepAgent({
+    model: new ChatOpenAI({
+      model: "deepseek-chat",
+      temperature: 0,
+      apiKey,
+      configuration: {
+        baseURL: "https://api.deepseek.com/v1",
+      },
+    }),
+    tools: [knowledgeBaseSearch],
+    systemPrompt: researchInstructions,
+    subagents: [critiqueSubAgent, researchSubAgent],
+    backend: () =>
+      new FilesystemBackend({
+        rootDir: KNOWLEDGE_PATH,
+        virtualMode: true,
+      }),
+  });
 }
 
-// Run if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+// Stream research with event callbacks
+export async function streamResearchWithAgent(
+  question: string,
+  onChunk: (chunk: ResearchStreamChunk) => void,
+  abortSignal: AbortSignal,
+): Promise<{
+  report: string;
+  todos: Array<{ content: string; status: string }>;
+}> {
+  const agent = createResearchAgent();
+
+  // Send initial phase
+  onChunk({
+    type: "phase",
+    phase: "initialization",
+    phaseName: "初始化",
+    phaseIcon: "🚀",
+  });
+
+  onChunk({ type: "thinking", content: "正在启动研究代理..." });
+  onChunk({ type: "thinking", content: `研究主题: ${question}` });
+
+  try {
+    // Run the agent
+    const result = await agent.invoke(
+      {
+        messages: [new HumanMessage(question)],
+      },
+      {
+        recursionLimit: 100,
+      },
+    );
+
+    // Extract the final report from files
+    const files = result.files || {};
+    const report = files["final_report.md"] || "未生成报告";
+
+    // Send report
+    onChunk({
+      type: "phase",
+      phase: "report_generation",
+      phaseName: "报告生成",
+      phaseIcon: "📝",
+    });
+    onChunk({ type: "report", content: report });
+
+    // Send completed phase
+    onChunk({
+      type: "phase",
+      phase: "completed",
+      phaseName: "完成",
+      phaseIcon: "✅",
+    });
+    onChunk({ type: "done" });
+
+    return {
+      report,
+      todos: result.todos || [],
+    };
+  } catch (error) {
+    onChunk({
+      type: "error",
+      error: error instanceof Error ? error.message : "研究失败",
+    });
+    throw error;
+  }
 }

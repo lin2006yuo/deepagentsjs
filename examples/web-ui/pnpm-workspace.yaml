@@ -1,3 +1,4 @@
 packages:
-  - 'apps/*'
-  - 'packages/*'
+  - "apps/*"
+  - "packages/*"
+  - "/Users/linxueyu/studio/deepagentsjs/libs/deepagents"

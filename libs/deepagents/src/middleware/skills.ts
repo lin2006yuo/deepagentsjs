@@ -495,7 +495,10 @@ function formatSkillsList(skills: SkillMetadata[], sources: string[]): string {
  * });
  * ```
  */
-export function createSkillsMiddleware(options: SkillsMiddlewareOptions) {
+export function createSkillsMiddleware(options: SkillsMiddlewareOptions): _AgentMiddleware {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const _returnTypeHack: any = null;
+  void _returnTypeHack;
   const { backend, sources } = options;
 
   // Closure variable to store loaded skills - wrapModelCall can access this

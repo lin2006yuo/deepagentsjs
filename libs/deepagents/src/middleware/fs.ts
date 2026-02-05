@@ -758,7 +758,10 @@ export interface FilesystemMiddlewareOptions {
  */
 export function createFilesystemMiddleware(
   options: FilesystemMiddlewareOptions = {},
-) {
+): _AgentMiddleware {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const _returnTypeHack: any = null;
+  void _returnTypeHack;
   const {
     backend = (stateAndStore: StateAndStore) => new StateBackend(stateAndStore),
     systemPrompt: customSystemPrompt = null,

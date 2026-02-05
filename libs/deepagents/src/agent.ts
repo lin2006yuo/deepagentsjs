@@ -38,6 +38,7 @@ import type {
  */
 import type * as _messages from "@langchain/core/messages";
 import type * as _Command from "@langchain/langgraph";
+import type { ReactAgent } from "langchain";
 
 const BASE_PROMPT = `In order to complete the objective that the user asks of you, you have access to a number of standard tools.`;
 
@@ -93,7 +94,27 @@ export function createDeepAgent<
     TSubagents,
     TTools
   >,
-) {
+): DeepAgent<
+  DeepAgentTypeConfig<
+    TResponse,
+    undefined,
+    ContextSchema,
+    readonly [
+      ...[
+        ReturnType<typeof todoListMiddleware>,
+        ReturnType<typeof createFilesystemMiddleware>,
+        ReturnType<typeof createSubAgentMiddleware>,
+        ReturnType<typeof summarizationMiddleware>,
+        ReturnType<typeof anthropicPromptCachingMiddleware>,
+        ReturnType<typeof createPatchToolCallsMiddleware>,
+      ],
+      ...TMiddleware,
+      ...FlattenSubAgentMiddleware<TSubagents>,
+    ],
+    TTools,
+    TSubagents
+  >
+> {
   const {
     model = "claude-sonnet-4-5-20250929",
     tools = [],
@@ -271,33 +292,5 @@ export function createDeepAgent<
     name,
   });
 
-  /**
-   * Combine custom middleware with flattened subagent middleware for complete type inference
-   * This ensures InferMiddlewareStates captures state from both sources
-   */
-  type AllMiddleware = readonly [
-    ...typeof builtInMiddleware,
-    ...TMiddleware,
-    ...FlattenSubAgentMiddleware<TSubagents>,
-  ];
-
-  /**
-   * Return as DeepAgent with proper DeepAgentTypeConfig
-   * - Response: TResponse (from responseFormat parameter)
-   * - State: undefined (state comes from middleware)
-   * - Context: ContextSchema
-   * - Middleware: AllMiddleware (built-in + custom + subagent middleware for state inference)
-   * - Tools: TTools
-   * - Subagents: TSubagents (for type-safe streaming)
-   */
-  return agent as unknown as DeepAgent<
-    DeepAgentTypeConfig<
-      TResponse,
-      undefined,
-      ContextSchema,
-      AllMiddleware,
-      TTools,
-      TSubagents
-    >
-  >;
+  return agent as any;
 }

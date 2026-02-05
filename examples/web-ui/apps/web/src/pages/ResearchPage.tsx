@@ -10,6 +10,7 @@ import {
   AlertCircle,
   History,
   X,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +43,7 @@ export function ResearchPage() {
   );
   const [showHistory, setShowHistory] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [useAgent, setUseAgent] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { recentInputs, addRecentInput } = useRecentInputs();
 
@@ -121,9 +123,10 @@ export function ResearchPage() {
           addStreamChunk(chunk);
         },
         abortController.signal,
+        useAgent,
       );
 
-      toast.success("研究完成");
+      toast.success(useAgent ? "AI 代理研究完成" : "研究完成");
       loadSessions(); // Refresh sessions list
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
@@ -139,6 +142,7 @@ export function ResearchPage() {
     }
   }, [
     question,
+    useAgent,
     setIsLoading,
     clearStreamChunks,
     setAbortController,
@@ -241,7 +245,7 @@ export function ResearchPage() {
                   ) : (
                     <>
                       <Search className="w-4 h-4 mr-2" />
-                      开始研究
+                      {useAgent ? "AI 代理研究" : "开始研究"}
                     </>
                   )}
                 </Button>
@@ -250,6 +254,24 @@ export function ResearchPage() {
                     取消
                   </Button>
                 )}
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-primary" />
+                  <span className="text-sm">AI 代理模式</span>
+                </div>
+                <button
+                  onClick={() => setUseAgent(!useAgent)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    useAgent ? "bg-primary" : "bg-muted-foreground/30"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                      useAgent ? "translate-x-5" : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
               <Button
                 variant="ghost"
@@ -405,7 +427,9 @@ export function ResearchPage() {
                     </div>
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-xs text-muted-foreground">
-                        {new Date(session.createdAt).toLocaleDateString("zh-CN")}
+                        {new Date(session.createdAt).toLocaleDateString(
+                          "zh-CN",
+                        )}
                       </span>
                       {getStatusBadge(session.status)}
                     </div>

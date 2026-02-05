@@ -1,8 +1,8 @@
-import { Router } from 'express';
-import * as path from 'path';
-import * as fs from 'fs';
-import { fileURLToPath } from 'url';
-import { z } from 'zod';
+import { Router } from "express";
+import * as path from "path";
+import * as fs from "fs";
+import { fileURLToPath } from "url";
+import { z } from "zod/v4";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,8 +10,8 @@ const __dirname = path.dirname(__filename);
 const router = Router();
 
 // Memory storage path
-const MEMORY_PATH = path.join(__dirname, '../../data/memory');
-const AGENTS_MD_PATH = path.join(MEMORY_PATH, 'AGENTS.md');
+const MEMORY_PATH = path.join(__dirname, "../../data/memory");
+const AGENTS_MD_PATH = path.join(MEMORY_PATH, "AGENTS.md");
 
 // Ensure memory directory exists
 if (!fs.existsSync(MEMORY_PATH)) {
@@ -44,58 +44,60 @@ description: DeepAgents Web UI Project Configuration
 
 // Initialize AGENTS.md if not exists
 if (!fs.existsSync(AGENTS_MD_PATH)) {
-  fs.writeFileSync(AGENTS_MD_PATH, DEFAULT_AGENTS_MD, 'utf-8');
+  fs.writeFileSync(AGENTS_MD_PATH, DEFAULT_AGENTS_MD, "utf-8");
 }
 
 // GET /api/memory - Get memory content
-router.get('/', (req, res) => {
+router.get("/", (req, res) => {
   try {
     if (!fs.existsSync(AGENTS_MD_PATH)) {
-      res.json({ content: '', source: 'AGENTS.md', updatedAt: 0 });
+      res.json({ content: "", source: "AGENTS.md", updatedAt: 0 });
       return;
     }
 
-    const content = fs.readFileSync(AGENTS_MD_PATH, 'utf-8');
+    const content = fs.readFileSync(AGENTS_MD_PATH, "utf-8");
     const stat = fs.statSync(AGENTS_MD_PATH);
 
     res.json({
       content,
-      source: 'AGENTS.md',
-      updatedAt: stat.mtime.getTime()
+      source: "AGENTS.md",
+      updatedAt: stat.mtime.getTime(),
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to read memory' });
+    res.status(500).json({ error: "Failed to read memory" });
   }
 });
 
 // POST /api/memory - Update memory content
 const updateSchema = z.object({
-  content: z.string()
+  content: z.string(),
 });
 
-router.post('/', (req, res) => {
+router.post("/", (req, res) => {
   try {
     const result = updateSchema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ error: 'Invalid request', details: result.error.errors });
+      res
+        .status(400)
+        .json({ error: "Invalid request", details: result.error.issues });
       return;
     }
 
     const { content } = result.data;
-    fs.writeFileSync(AGENTS_MD_PATH, content, 'utf-8');
+    fs.writeFileSync(AGENTS_MD_PATH, content, "utf-8");
 
     res.json({
       success: true,
-      source: 'AGENTS.md',
-      updatedAt: Date.now()
+      source: "AGENTS.md",
+      updatedAt: Date.now(),
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update memory' });
+    res.status(500).json({ error: "Failed to update memory" });
   }
 });
 
 // GET /api/memory/files - List all memory files
-router.get('/files', (req, res) => {
+router.get("/files", (req, res) => {
   try {
     const files: Array<{ name: string; updatedAt: number }> = [];
 
@@ -107,7 +109,7 @@ router.get('/files', (req, res) => {
         if (stat.isFile()) {
           files.push({
             name: entry,
-            updatedAt: stat.mtime.getTime()
+            updatedAt: stat.mtime.getTime(),
           });
         }
       }
@@ -115,7 +117,7 @@ router.get('/files', (req, res) => {
 
     res.json({ files });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to list memory files' });
+    res.status(500).json({ error: "Failed to list memory files" });
   }
 });
 

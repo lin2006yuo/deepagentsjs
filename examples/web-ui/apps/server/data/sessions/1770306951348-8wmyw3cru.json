@@ -1,0 +1,22 @@
+{
+  "id": "1770306951348-8wmyw3cru",
+  "question": "langgraph 是什么",
+  "status": "completed",
+  "createdAt": 1770306951349,
+  "updatedAt": 1770306955468,
+  "todos": [
+    {
+      "content": "搜索知识库文档",
+      "status": "completed"
+    },
+    {
+      "content": "分析研究主题",
+      "status": "in_progress"
+    },
+    {
+      "content": "生成研究报告",
+      "status": "pending"
+    }
+  ],
+  "report": "# 研究报告: langgraph 是什么\n\n## 概述\n\n本报告基于本地知识库对 \"langgraph 是什么\" 进行了深入研究。\n\n## 研究发现\n\n### 1. 核心概念\n\n根据知识库文档，我们发现以下关键信息：\n\n- **LangGraph**: 一个用于构建复杂 AI 代理工作流的框架\n- **Deep Agents**: 基于 LangGraph 的高级代理库\n- **AI Agent 模式**: 包括 ReAct、Plan-and-Execute 等设计模式\n\n### 2. 技术细节\n\n#### LangGraph 特性\n- 支持状态管理\n- 图结构工作流\n- 人机协同 (HITL)\n\n#### Deep Agents 能力\n- 子代理系统\n- 技能管理\n- 记忆持久化\n\n## 结论\n\n研究表明，使用 LangGraph 和 Deep Agents 可以构建强大的 AI 代理系统。\n\n## 来源\n\n- langgraph-intro.md\n- deep-agents-guide.md\n- ai-agent-patterns.md\n"
+}

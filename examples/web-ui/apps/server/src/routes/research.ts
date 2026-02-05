@@ -2,14 +2,15 @@ import { Router } from "express";
 import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { setupSSE, sendSSE, endSSE } from "../middleware/sse.js";
 import * as researchService from "../services/researchService.js";
+import * as agentResearchService from "../services/agentResearchService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const router = Router();
+const router: Router = Router();
 
 // Knowledge base path
 const KNOWLEDGE_PATH = path.join(__dirname, "../../data/knowledge");
@@ -145,11 +146,13 @@ router.post("/stream", async (req, res) => {
     if (!result.success) {
       res
         .status(400)
-        .json({ error: "Invalid request", details: result.error.errors });
+        .json({ error: "Invalid request", details: result.error.issues });
       return;
     }
 
     const { question, sessionId, knowledgeBase } = result.data;
+    const useAgent =
+      req.query.agent === "true" || process.env.USE_AGENT === "true";
 
     setupSSE({ res });
 
@@ -159,15 +162,27 @@ router.post("/stream", async (req, res) => {
       abortController.abort();
     });
 
-    await researchService.streamResearch({
-      question,
-      sessionId,
-      knowledgeBase,
-      onChunk: (chunk) => {
-        sendSSE(res, chunk);
-      },
-      abortSignal: abortController.signal,
-    });
+    if (useAgent) {
+      // Use AI agent for research
+      await agentResearchService.streamResearchWithAgent(
+        question,
+        (chunk) => {
+          sendSSE(res, chunk);
+        },
+        abortController.signal,
+      );
+    } else {
+      // Use simple research flow
+      await researchService.streamResearch({
+        question,
+        sessionId,
+        knowledgeBase,
+        onChunk: (chunk) => {
+          sendSSE(res, chunk);
+        },
+        abortSignal: abortController.signal,
+      });
+    }
 
     endSSE(res);
   } catch (error) {
